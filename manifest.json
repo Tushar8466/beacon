@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "CF2GitHub - Codeforces to GitHub",
+  "version": "1.0.0",
+  "description": "Automatically pushes your Accepted Codeforces solutions to a GitHub repository with clean folder structure and README.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://codeforces.com/*",
+    "https://api.github.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://codeforces.com/contest/*/status*",
+        "https://codeforces.com/contest/*/my*",
+        "https://codeforces.com/problemset/status*",
+        "https://codeforces.com/submissions/*"
+      ],
+      "css": ["toast.css"],
+      "js": ["common.js", "content-status.js"],
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://codeforces.com/*"
+      ],
+      "css": ["toast.css"],
+      "js": ["common.js", "content-submission.js"],
+      "all_frames": true
+    }
+  ]
+}
