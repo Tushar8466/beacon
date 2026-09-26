@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "CF2GitHub - Codeforces to GitHub",
+  "name": "Beacon - Codeforces to GitHub",
   "version": "1.0.0",
   "description": "Automatically pushes your Accepted Codeforces solutions to a GitHub repository with clean folder structure and README.",
   "permissions": ["storage"],
