@@ -1,91 +1,147 @@
-# CF2GitHub - Codeforces to GitHub Auto-Sync Extension
+# 🏮 Beacon — Codeforces to GitHub Auto-Sync
 
-**CF2GitHub** is a Chrome extension (Manifest V3) that automatically syncs your Accepted [Codeforces](https://codeforces.com) solutions directly to your personal GitHub repository. Each solution is stored in a clean folder structure accompanied by an auto-generated `README.md`.
+**Beacon** is a Chrome extension (Manifest V3) that watches your Codeforces
+submissions and, the moment one is **Accepted**, automatically pushes the
+source code to a GitHub repository of your choice — organized into a clean
+folder structure with an auto-generated `README.md` for every solution.
+
+Like a lighthouse guiding a ship home, Beacon makes sure every solved
+problem finds its way safely into your GitHub history — no copy-pasting,
+no forgetting to commit.
 
 ---
 
 ## ✨ Features
 
-1. **Auto-Detection on Status & Submissions Pages**
-   - Monitors status pages (`/contest/*/status`, `/problemset/status`, `/submissions/*`, `/contest/*/my`).
-   - Uses a `MutationObserver` to catch submissions as their verdict updates to **Accepted** in real-time.
-   - **Smart Time Filter**: Only auto-pushes recent submissions (submitted within ~15 minutes). This prevents bulk-pushing your entire past submission history when loading status pages.
-   - Shows floating toast notifications confirming successful GitHub commits.
-
-2. **Manual Push Button on Individual Submission Pages**
-   - Adds a floating **"⬆ Push to GitHub"** button on individual submission pages (`/contest/*/submission/*` & `/problemset/submission/*`).
-   - Reads problem metadata and source code directly from the page DOM.
-   - Acts as a fallback if auto-push was missed, or allows manually pushing older Accepted submissions.
-
-3. **Clean Repository Folder Structure & README Generator**
-   - Automatically maps Codeforces language strings to file extensions (`.cpp`, `.java`, `.py`, `.kt`, `.rs`, `.go`, `.js`, `.cs`, etc.).
-   - File Path Pattern:  
-     `{folderPrefix}/{contestId}{problemIndex}-{slugified-problem-name}/Solution.{ext}`
-   - Automatically generates a `README.md` alongside each solution containing:
-     - Direct link to the Codeforces problem
-     - Submission ID and link
-     - Programming language used
-     - Verdict ("Accepted")
-     - Code block preview
-
-4. **Modern Popup Settings UI**
-   - Configurable GitHub Personal Access Token (with visibility toggle).
-   - Custom Repository Owner, Repository Name, Branch (default `main`), and Folder Prefix (default `Codeforces`).
-   - Quick **"Test Connection"** button to verify GitHub API token and repository access.
-   - Auto-push toggle switch to quickly enable or disable automated background sync.
+- **Auto-push on Accepted** — watches your status/submissions pages and
+  detects the moment a *recent* submission turns green. No manual step
+  needed for solutions you just solved.
+- **Smart recency filter** — only auto-pushes submissions from the last
+  ~15 minutes, so opening your submission history doesn't flood your repo
+  with hundreds of old solutions at once.
+- **Manual "Push to GitHub" button** — appears next to any submission's
+  source code (including inline/expanded views), so you can push older
+  solutions on demand or use it as a reliable fallback.
+- **Clean repo structure** — solutions are filed under:
+  ```
+  {folderPrefix}/{contestId}{problemIndex}-{slugified-problem-name}/Solution.{ext}
+  ```
+  with an auto-written `README.md` alongside each one, containing the
+  problem link, language, verdict, and submission link.
+- **Broad language support** — auto-detects the right file extension for
+  C++, Python/PyPy, Java, Kotlin, Rust, Go, JavaScript, C#, and more.
+- **Simple settings popup** — GitHub token, repo owner/name, branch, and
+  folder prefix, plus a one-click "Test Connection" button.
 
 ---
 
-## 🚀 Installation & Setup Guide
+## 🚀 Installation
 
-### Step 1: Create a GitHub Personal Access Token (PAT)
-1. Go to [GitHub Developer Settings > Personal Access Tokens](https://github.com/settings/tokens).
-2. Click **Generate new token (classic)** or create a **Fine-grained token**.
-3. Set Token Permissions:
-   - **Classic Token**: Check the `repo` scope (Full control of private/public repositories).
-   - **Fine-grained Token**: Grant **Repository permissions > Contents: Read and Write**.
-4. Copy the generated token string.
-
-### Step 2: Load Unpacked Extension into Chrome
-1. Open Google Chrome and navigate to `chrome://extensions/`.
-2. Enable **Developer mode** in the top-right corner.
-3. Click **Load unpacked** in the top-left corner.
-4. Select the directory containing this project repository (`beacon` folder).
-
-### Step 3: Configure Extension Popup
-1. Click the **CF2GitHub** icon in the Chrome toolbar.
-2. Enter your credentials:
-   - **GitHub Personal Access Token**: Paste your token.
-   - **Repo Owner**: Your GitHub username or organization name.
-   - **Repo Name**: Your target repository (e.g., `Competitive-Programming`).
-   - **Branch**: Target branch (default: `main`).
-   - **Folder Prefix**: Parent folder in the repository (default: `Codeforces`).
-   - **Auto-Push Switch**: Keep enabled for automatic background sync.
-3. Click **Test Connection** to verify settings.
-4. Click **Save Settings**.
+1. Download or clone this extension's folder onto your computer.
+2. Open Chrome and go to `chrome://extensions`.
+3. Turn on **Developer mode** (top-right toggle).
+4. Click **Load unpacked** and select the `beacon` folder.
+5. Pin the extension and click its icon to open settings.
 
 ---
 
-## 📂 File Structure
+## ⚙️ Setup
 
-```
-├── manifest.json            # Manifest V3 extension configuration
-├── common.js                # Shared utilities (language mapping, slugifier, time checker, toast)
-├── content-status.js        # Content script for status tables (Auto-push)
-├── content-submission.js    # Content script for submission details page (Manual push button)
-├── toast.css                # CSS styles for page toast notifications
-├── background.js            # Service worker handling GitHub REST Contents API commits
-├── popup.html               # Settings UI layout
-├── popup.css                # Modern popup UI theme
-├── popup.js                 # Popup controller & connection testing
-├── icons/                   # Extension icons (16x16, 48x48, 128x128)
-└── README.md                # Project documentation
-```
+### 1. Create a GitHub Personal Access Token
+- **Classic token**: [github.com/settings/tokens](https://github.com/settings/tokens)
+  → generate new token → check the **`repo`** scope.
+- **Fine-grained token**: scope it to one repository with
+  **Contents: Read and write** permission.
+
+### 2. Pick or create a GitHub repo
+Somewhere to hold your solutions, e.g. `codeforces-solutions`.
+
+### 3. Configure the popup
+Open the Beacon icon and fill in:
+| Field | Example |
+|---|---|
+| GitHub Personal Access Token | `ghp_...` or `github_pat_...` |
+| Repo Owner | your GitHub username |
+| Repo Name | `codeforces-solutions` |
+| Branch | `main` |
+| Folder Prefix | `Codeforces` |
+| Auto-Push Accepted Solutions | on |
+
+Click **Test Connection** to confirm Beacon can see your repo, then
+**Save Settings**.
+
+### 4. Solve problems as usual
+Once a submission is Accepted, watch for the toast notification confirming
+the push — or click **Push to GitHub** manually if you'd rather trigger it
+yourself.
 
 ---
 
-## ⚠️ Known Limitations & Troubleshooting
+## 🧠 How it works
 
-- **DOM Selectors**: Codeforces occasionally updates its site layout. If auto-detection stops working, verify that table classes (`table.status-frame-datatable`, `.verdict-accepted`, `#program-source-text`) match the current site markup.
-- **Bulk Imports**: The extension deliberately filters out submissions older than ~15 minutes to prevent auto-pushing hundreds of past solutions at once. To sync older solutions, navigate to their individual submission page and click **"⬆ Push to GitHub"**.
-- **Token Security**: Your Personal Access Token is stored locally in Chrome's encrypted `chrome.storage.sync` area and is only sent directly to `api.github.com`.
+- **`content-status.js`** watches the submissions/status table with a
+  `MutationObserver` (since Codeforces updates verdicts live via JS
+  without a page reload). When a row turns Accepted *and* its "when"
+  column says something recent (e.g. "3 minutes ago"), it fetches that
+  submission's page, extracts the source code, and messages the
+  background script.
+- **`content-submission.js`** injects a floating/inline **"Push to
+  GitHub"** button wherever a source-code block appears — including
+  inside Codeforces's inline "expanded submission" view (which loads in
+  an iframe, so this script runs with `all_frames: true` to reach it).
+- **`background.js`** is the service worker that talks to the GitHub
+  REST Contents API: it checks whether the target file already exists
+  (to update vs. create), then commits the solution and a companion
+  README.
+
+---
+
+## ⚠️ Known limitations
+
+- **Codeforces can change its markup.** Selectors are written defensively,
+  but if auto-detection or the push button stop appearing after a
+  Codeforces redesign, check (via DevTools):
+  - the status table still has rows you can select (e.g. via
+    `data-submission-id` or similar),
+  - the verdict element still identifies "Accepted" somehow,
+  - the source code block still exposes its text (e.g. via
+    `#program-source-text` or a `<pre>` element).
+- **No bulk import** of your entire past submission history yet — use the
+  manual button one submission at a time to backfill older solutions.
+- **Recency window is fixed at ~15 minutes** by default for auto-push;
+  adjust this in `common.js` if you want a longer or shorter window.
+- Your GitHub token is stored in `chrome.storage.sync`, which syncs
+  across Chrome browsers you're signed into. Use a repo-scoped
+  fine-grained token if that's a concern.
+
+---
+
+## 📂 File structure
+
+| File | Purpose |
+|---|---|
+| `manifest.json` | Extension configuration (Manifest V3) |
+| `common.js` | Shared helpers: language → extension mapping, recency check, slugify, base64 encoding, toast notifications |
+| `content-status.js` | Auto-detects fresh Accepted submissions and triggers a push |
+| `content-submission.js` | Injects the manual "Push to GitHub" button |
+| `background.js` | Talks to the GitHub REST API to create/update files |
+| `popup.html` / `popup.js` / `popup.css` | Settings UI |
+| `toast.css` | Styling for in-page toast notifications |
+
+---
+
+## 🛠️ Troubleshooting
+
+**Button doesn't appear:** the code viewer may be inside an iframe (check
+via right-click → Inspect → look for a "This Frame" context menu option).
+Make sure every entry in `content_scripts` in `manifest.json` has
+`"all_frames": true`.
+
+**Push button stuck on "Pushing...":** open `chrome://extensions`, click
+the **service worker** link under Beacon, and check its Console/Network
+tabs for the actual error — this is where background script failures
+show up, not the page's own DevTools console.
+
+**"Repository not found" on Test Connection:** double-check Repo Owner is
+your exact GitHub handle (not your display name) and that your token has
+access to that repository.
