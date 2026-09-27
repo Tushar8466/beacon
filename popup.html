@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Beacon Settings</title>
+  <title>Beacon — Codeforces to GitHub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +13,8 @@
 
 <body>
   <div class="popup-container">
-    <!-- Header -->
+
+    <!-- ── Header ──────────────────────────────────────── -->
     <header class="header">
       <div class="brand">
         <div class="logo-icon">
@@ -21,108 +22,222 @@
         </div>
         <div>
           <h1 class="title">Beacon</h1>
-          <p class="subtitle">Codeforces to GitHub Auto-Sync</p>
+          <p class="subtitle">Codeforces → GitHub</p>
         </div>
       </div>
       <span class="version-badge">v1.0</span>
     </header>
 
-    <!-- Main Content Form -->
-    <main class="content">
-      <div id="status-alert" class="alert hidden">
-        <span id="alert-icon" class="alert-icon"></span>
-        <span id="alert-message" class="alert-message"></span>
+    <!-- ── Loading skeleton (hidden after storage read) ── -->
+    <div id="loading-skeleton" class="skeleton-wrap">
+      <div class="skeleton sk-tall"></div>
+      <div class="skeleton sk-short"></div>
+      <div class="skeleton sk-medium"></div>
+    </div>
+
+    <!-- ── Shared alert ──────────────────────────────────── -->
+    <div id="status-alert" class="alert hidden" role="alert" aria-live="polite">
+      <span id="alert-icon" class="alert-icon" aria-hidden="true"></span>
+      <span id="alert-message" class="alert-message"></span>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════
+         CONNECTED VIEW
+         ══════════════════════════════════════════════════ -->
+    <section id="connected-view" class="view hidden" aria-label="Connected repository">
+
+      <!-- Repo status card -->
+      <div class="connected-card">
+        <div class="connected-badge" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <div class="connected-info">
+          <span class="connected-label">Connected to</span>
+          <a id="repo-link" class="repo-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+        </div>
       </div>
 
-      <form id="settings-form" autocomplete="off">
+      <!-- Branch & Folder Prefix chips -->
+      <div class="chips-row" aria-label="Repository settings">
+        <div class="chip">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="6" y1="3" x2="6" y2="15"></line>
+            <circle cx="18" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <path d="M18 9a9 9 0 0 1-9 9"></path>
+          </svg>
+          <span class="chip-label">Branch</span>
+          <span id="chip-branch" class="chip-value"></span>
+        </div>
+        <div class="chip">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span class="chip-label">Prefix</span>
+          <span id="chip-prefix" class="chip-value"></span>
+        </div>
+      </div>
+
+      <!-- Auto-push toggle -->
+      <div class="toggle-card">
+        <div class="toggle-info">
+          <span class="toggle-title">Auto-Push Accepted Solutions</span>
+          <span class="toggle-desc">Pushes submissions from the last ~15 minutes automatically</span>
+        </div>
+        <label class="switch" aria-label="Toggle auto-push">
+          <input type="checkbox" id="autoPushConnected">
+          <span class="slider" aria-hidden="true"></span>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions-row">
+        <button type="button" id="change-repo-btn" class="btn btn-secondary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Change Repo</span>
+        </button>
+        <button type="button" id="disconnect-btn" class="btn btn-danger">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18.36 6.64A9 9 0 0 1 20.77 15"></path>
+            <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68"></path>
+            <path d="M12 2v4"></path>
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+          </svg>
+          <span>Disconnect</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════
+         SETTINGS FORM
+         ══════════════════════════════════════════════════ -->
+    <main id="settings-view" class="view hidden" aria-label="Repository setup">
+
+      <!-- First-run welcome banner (hidden when editing) -->
+      <div id="welcome-banner" class="welcome-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Connect a GitHub repo to start auto-syncing your Accepted solutions.</span>
+      </div>
+
+      <form id="settings-form" autocomplete="off" novalidate>
+
         <!-- GitHub Token -->
-        <div class="form-group">
+        <div class="form-group" id="group-token">
           <label for="githubToken" class="form-label">
-            <span>GitHub Personal Access Token</span>
-            <span class="required">*</span>
+            GitHub Personal Access Token
+            <span class="required" aria-label="required">*</span>
           </label>
           <div class="input-wrapper">
-            <input type="password" id="githubToken" placeholder="ghp_... or github_pat_..." required />
-            <button type="button" id="toggle-token-btn" class="icon-btn" title="Toggle Visibility">
-              <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <input type="password" id="githubToken" name="githubToken"
+              placeholder="ghp_xxxx  or  github_pat_xxxx"
+              autocomplete="new-password" required />
+            <button type="button" id="toggle-token-btn" class="icon-btn"
+              aria-label="Toggle token visibility" title="Toggle visibility">
+              <svg id="eye-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
             </button>
           </div>
-          <span class="form-hint">Token needs <code>repo</code> or <code>Contents: Read & Write</code>
-            permission.</span>
+          <span class="form-hint">Needs <code>repo</code> scope or <code>Contents: Read &amp; Write</code> in fine-grained tokens.</span>
+          <span class="field-error hidden" id="err-token" role="alert"></span>
         </div>
 
-        <!-- Owner & Repo Grid -->
+        <!-- Owner & Repo row -->
         <div class="form-row">
-          <div class="form-group flex-1">
+          <div class="form-group flex-1" id="group-owner">
             <label for="repoOwner" class="form-label">
-              <span>Repo Owner</span>
-              <span class="required">*</span>
+              Owner <span class="required" aria-label="required">*</span>
             </label>
-            <input type="text" id="repoOwner" placeholder="e.g. Tushar8466" required />
-            <span class="form-hint">GitHub handle (not display name)</span>
+            <input type="text" id="repoOwner" name="repoOwner"
+              placeholder="your-handle" required />
+            <span class="form-hint">Exact GitHub username</span>
+            <span class="field-error hidden" id="err-owner" role="alert"></span>
           </div>
-
-          <div class="form-group flex-1">
+          <div class="form-group flex-1" id="group-repo">
             <label for="repoName" class="form-label">
-              <span>Repo Name</span>
-              <span class="required">*</span>
+              Repository <span class="required" aria-label="required">*</span>
             </label>
-            <input type="text" id="repoName" placeholder="e.g. Competitive-Programming" required />
+            <input type="text" id="repoName" name="repoName"
+              placeholder="my-solutions" required />
+            <span class="field-error hidden" id="err-repo" role="alert"></span>
           </div>
         </div>
 
-        <!-- Branch & Folder Prefix Grid -->
+        <!-- Branch & Folder Prefix row -->
         <div class="form-row">
           <div class="form-group flex-1">
             <label for="branch" class="form-label">Branch</label>
-            <input type="text" id="branch" placeholder="main" value="main" />
+            <input type="text" id="branch" name="branch" placeholder="main" value="main"
+              title="The branch to push solutions to (e.g. main or master)" />
+            <span class="form-hint">Target push branch</span>
           </div>
-
           <div class="form-group flex-1">
             <label for="folderPrefix" class="form-label">Folder Prefix</label>
-            <input type="text" id="folderPrefix" placeholder="Codeforces" value="Codeforces" />
+            <input type="text" id="folderPrefix" name="folderPrefix" placeholder="Codeforces" value="Codeforces"
+              title="Top-level folder inside your repo (e.g. Codeforces/1234A-Problem/)" />
+            <span class="form-hint">Top-level folder in repo</span>
           </div>
         </div>
 
-        <!-- Auto Push Switch Box -->
+        <!-- Auto-push toggle -->
         <div class="toggle-card">
           <div class="toggle-info">
             <span class="toggle-title">Auto-Push Accepted Solutions</span>
-            <span class="toggle-desc">Automatically pushes solutions submitted in the last ~15 mins</span>
+            <span class="toggle-desc">Pushes submissions from the last ~15 minutes automatically</span>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="autoPush" checked />
-            <span class="slider"></span>
+          <label class="switch" aria-label="Toggle auto-push">
+            <input type="checkbox" id="autoPush" checked>
+            <span class="slider" aria-hidden="true"></span>
           </label>
         </div>
 
         <!-- Actions -->
         <div class="actions-row">
           <button type="button" id="test-btn" class="btn btn-secondary">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
+            <svg id="test-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
             </svg>
-            <span>Test Connection</span>
+            <span id="test-label">Test Connection</span>
           </button>
 
           <button type="submit" id="save-btn" class="btn btn-primary">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
+            <svg id="save-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
               <polyline points="17 21 17 13 7 13 7 21"></polyline>
               <polyline points="7 3 7 8 15 8"></polyline>
             </svg>
-            <span>Save Settings</span>
+            <span id="save-label">Save &amp; Connect</span>
           </button>
         </div>
+
+        <!-- Cancel — only shown when editing an existing connection -->
+        <button type="button" id="cancel-edit-btn" class="btn btn-ghost hidden">
+          ← Cancel, keep existing settings
+        </button>
+
       </form>
     </main>
-  </div>
+
+  </div><!-- /.popup-container -->
 
   <script src="common.js"></script>
   <script src="popup.js"></script>

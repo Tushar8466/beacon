@@ -1,8 +1,9 @@
 /**
- * CF2GitHub - Content Script for Individual Submission Pages & Popup Modals
- * 
- * Injects a "⬆ Push to GitHub" button when source code is displayed
+ * Beacon — Content Script for Individual Submission Pages & Popup Modals
+ *
+ * Injects a "Push to GitHub" button when source code is displayed
  * (works on dedicated submission pages AND dynamic popup lightboxes).
+ * Design-polished: matches Beacon popup palette & design system.
  */
 
 (function () {
@@ -64,13 +65,16 @@
     const btn = document.createElement('button');
     btn.id = 'cf2github-manual-btn';
     btn.className = 'cf2github-btn-floating';
+    btn.setAttribute('aria-label', 'Push solution to GitHub');
     btn.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="17 8 12 3 7 8"></polyline>
-        <line x1="12" y1="3" x2="12" y2="15"></line>
-      </svg>
-      <span>Push to GitHub</span>
+      <span class="cf2github-btn-logo" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </span>
+      <span class="cf2github-btn-text">Push to GitHub</span>
     `;
 
     btn.addEventListener('click', () => handleManualPush(btn, sourceEl));
@@ -88,13 +92,14 @@
     const btn = document.createElement('button');
     btn.id = 'cf2github-inline-btn';
     btn.className = 'cf2github-btn-inline';
+    btn.setAttribute('aria-label', 'Push solution to GitHub');
     btn.innerHTML = `
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
         <polyline points="17 8 12 3 7 8"></polyline>
         <line x1="12" y1="3" x2="12" y2="15"></line>
       </svg>
-      <span>Push to GitHub</span>
+      <span class="cf2github-btn-text">Push to GitHub</span>
     `;
 
     btn.addEventListener('click', () => handleManualPush(btn, sourceEl));
@@ -167,8 +172,8 @@
     btn.disabled = true;
     btn.classList.add('cf2github-btn-loading');
     btn.innerHTML = `
-      <span class="cf2github-spinner"></span>
-      <span>Pushing...</span>
+      <span class="cf2github-spinner" aria-hidden="true"></span>
+      <span class="cf2github-btn-text">Pushing…</span>
     `;
 
     function resetButton(errorMsg) {
@@ -176,11 +181,17 @@
       btn.classList.remove('cf2github-btn-loading');
       btn.innerHTML = originalContent;
       if (errorMsg) {
-        showToast(`Push failed: ${errorMsg}`, 'error', 7000);
+        showToastBeacon('Push Failed', errorMsg, 'error', 8000);
       }
     }
 
     try {
+      // Check if extension context is valid (detects reloads/updates)
+      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id) {
+        resetButton('Extension reloaded or updated. Please refresh this page (Cmd+R / F5) to reconnect.');
+        return;
+      }
+
       // 1. Fetch settings from chrome.storage.sync
       const settings = await chrome.storage.sync.get(['githubToken', 'repoOwner', 'repoName', 'branch', 'folderPrefix']);
       const token = settings.githubToken ? settings.githubToken.trim() : '';
@@ -337,23 +348,33 @@ ${code}
       btn.classList.remove('cf2github-btn-loading');
       btn.classList.add('cf2github-btn-success');
       btn.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
-        <span>Pushed ✓</span>
+        <span class="cf2github-btn-text">Pushed ✓</span>
       `;
-      showToast(`Successfully pushed ${cleanContest}${cleanIndex} - ${problemName} to GitHub!`, 'success');
+      showToastBeacon(
+        `Pushed ${cleanContest}${cleanIndex}`,
+        `${problemName} → GitHub`,
+        'success'
+      );
 
       // Record in local storage
-      const updatedStorage = await chrome.storage.local.get('pushedSubmissions');
-      const currentMap = updatedStorage.pushedSubmissions || {};
-      currentMap[submissionId] = {
-        contestId: cleanContest,
-        problemIndex: cleanIndex,
-        problemName,
-        pushedAt: new Date().toISOString()
-      };
-      await chrome.storage.local.set({ pushedSubmissions: currentMap });
+      try {
+        if (chrome?.runtime?.id && chrome?.storage?.local) {
+          const updatedStorage = await chrome.storage.local.get('pushedSubmissions');
+          const currentMap = updatedStorage.pushedSubmissions || {};
+          currentMap[submissionId] = {
+            contestId: cleanContest,
+            problemIndex: cleanIndex,
+            problemName,
+            pushedAt: new Date().toISOString()
+          };
+          await chrome.storage.local.set({ pushedSubmissions: currentMap });
+        }
+      } catch (storageErr) {
+        console.warn('[Beacon] Storage record skipped:', storageErr);
+      }
 
       setTimeout(() => {
         btn.disabled = false;
@@ -362,7 +383,12 @@ ${code}
       }, 4000);
 
     } catch (err) {
-      resetButton(err.message || 'An error occurred while pushing');
+      const msg = err && err.message ? err.message : String(err);
+      if (msg.includes('Extension context invalidated') || !chrome?.runtime?.id) {
+        resetButton('Extension reloaded or updated. Please refresh this page (Cmd+R / F5) to reconnect.');
+      } else {
+        resetButton(msg || 'An error occurred while pushing');
+      }
     }
   }
 
@@ -457,6 +483,7 @@ ${code}
 
   /**
    * Injects CSS styles for the manual buttons.
+   * Matches Beacon popup design system: same palette, radii, spacing, focus rings.
    */
   function injectButtonStyles() {
     if (document.getElementById('cf2github-btn-styles')) return;
@@ -464,78 +491,204 @@ ${code}
     const style = document.createElement('style');
     style.id = 'cf2github-btn-styles';
     style.textContent = `
+      /* ── Floating pill button ───────────────────────────── */
       .cf2github-btn-floating {
-        position: fixed;
-        bottom: 28px;
-        right: 28px;
-        z-index: 2147483647 !important;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 20px;
-        border-radius: 50px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        all: initial;
+        position: fixed !important;
+        bottom: 24px !important;
+        right: 24px !important;
+        z-index: 2147483646 !important; /* one below toast container */
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 11px 18px !important;
+        border-radius: 50px !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
         color: #ffffff !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 13.5px !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.1px !important;
+        cursor: pointer !important;
+        box-shadow:
+          0 0 0 1px rgba(255,255,255,0.12),
+          0 8px 24px rgba(37, 99, 235, 0.5),
+          0 2px 6px rgba(0, 0, 0, 0.25) !important;
+        transition:
+          background    200ms cubic-bezier(0.16,1,0.3,1),
+          box-shadow    200ms cubic-bezier(0.16,1,0.3,1),
+          transform     200ms cubic-bezier(0.16,1,0.3,1) !important;
+        /* Slide in on inject */
+        animation: cf2github-btn-enter 280ms cubic-bezier(0.16,1,0.3,1) both !important;
       }
 
+      @keyframes cf2github-btn-enter {
+        from { opacity: 0; transform: translateY(12px) scale(0.95); }
+        to   { opacity: 1; transform: translateY(0)   scale(1); }
+      }
+
+      /* ── Inline button (above code block) ─────────────── */
       .cf2github-btn-inline {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 14px;
-        margin-bottom: 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(37, 99, 235, 0.4);
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        color: #ffffff !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
-        transition: all 0.2s ease;
+        all: initial;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 7px 14px !important;
+        margin-bottom: 10px !important;
+        border-radius: 8px !important;
+        border: 1px solid rgba(59, 130, 246, 0.35) !important;
+        background: linear-gradient(135deg, rgba(59,130,246,0.14) 0%, rgba(37,99,235,0.1) 100%) !important;
+        color: #60a5fa !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.18) !important;
+        transition:
+          background 180ms ease,
+          box-shadow 180ms ease,
+          transform  180ms cubic-bezier(0.16,1,0.3,1),
+          color      180ms ease !important;
       }
 
-      .cf2github-btn-inline:hover:not(:disabled),
+      /* ── Shared hover ──────────────────────────────────── */
       .cf2github-btn-floating:hover:not(:disabled) {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%) !important;
+        box-shadow:
+          0 0 0 1px rgba(255,255,255,0.15),
+          0 12px 32px rgba(37, 99, 235, 0.55),
+          0 4px 10px rgba(0, 0, 0, 0.3) !important;
+        transform: translateY(-2px) !important;
       }
 
+      .cf2github-btn-inline:hover:not(:disabled) {
+        background: linear-gradient(135deg, rgba(59,130,246,0.22) 0%, rgba(37,99,235,0.16) 100%) !important;
+        color: #93c5fd !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28) !important;
+      }
+
+      /* ── Focus-visible ring ────────────────────────────── */
+      .cf2github-btn-floating:focus-visible,
+      .cf2github-btn-inline:focus-visible {
+        outline: 2px solid #60a5fa !important;
+        outline-offset: 3px !important;
+      }
+
+      /* ── Active (press) ────────────────────────────────── */
+      .cf2github-btn-floating:active:not(:disabled),
+      .cf2github-btn-inline:active:not(:disabled) {
+        transform: translateY(0) scale(0.98) !important;
+      }
+
+      /* ── Disabled ──────────────────────────────────────── */
       .cf2github-btn-floating:disabled,
       .cf2github-btn-inline:disabled {
-        opacity: 0.85;
-        cursor: not-allowed;
+        opacity: 0.7 !important;
+        cursor: not-allowed !important;
+        transform: none !important;
       }
 
-      .cf2github-btn-success {
+      /* ── Success state ─────────────────────────────────── */
+      .cf2github-btn-success.cf2github-btn-floating {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4) !important;
+        border-color: rgba(255,255,255,0.2) !important;
+        box-shadow:
+          0 0 0 1px rgba(255,255,255,0.12),
+          0 8px 24px rgba(16, 185, 129, 0.45) !important;
+        color: #ffffff !important;
       }
 
+      .cf2github-btn-success.cf2github-btn-inline {
+        background: linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.14) 100%) !important;
+        border-color: rgba(16, 185, 129, 0.4) !important;
+        color: #34d399 !important;
+      }
+
+      /* ── Spinner ───────────────────────────────────────── */
       .cf2github-spinner {
-        width: 14px;
-        height: 14px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-top-color: #ffffff;
-        border-radius: 50%;
-        animation: cf2github-spin 0.8s linear infinite;
-        display: inline-block;
+        display: inline-block !important;
+        width: 13px !important;
+        height: 13px !important;
+        border: 2px solid rgba(255, 255, 255, 0.25) !important;
+        border-top-color: #ffffff !important;
+        border-radius: 50% !important;
+        animation: cf2github-spin 0.75s linear infinite !important;
+        flex-shrink: 0 !important;
       }
 
       @keyframes cf2github-spin {
         to { transform: rotate(360deg); }
       }
+
+      /* Logo icon container inside floating btn */
+      .cf2github-btn-logo {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 6px !important;
+        background: rgba(255,255,255,0.15) !important;
+        flex-shrink: 0 !important;
+      }
+
+      .cf2github-btn-text {
+        display: inline !important;
+        font: inherit !important;
+        color: inherit !important;
+      }
     `;
     document.head.appendChild(style);
+  }
+
+  /**
+   * Shows a polished Beacon toast with title + body lines and a dismiss button.
+   * Wraps/upgrades the existing showToast utility for page-injected UI.
+   */
+  function showToastBeacon(title, body, type = 'info', duration = 5000) {
+    // Ensure container
+    let container = document.querySelector('.cf2github-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'cf2github-toast-container';
+      document.body.appendChild(container);
+    }
+
+    const icons = { success: '✓', error: '✕', info: 'ℹ' };
+
+    const toast = document.createElement('div');
+    toast.className = `cf2github-toast cf2github-toast-${type}`;
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    toast.innerHTML = `
+      <span class="cf2github-toast-icon" aria-hidden="true">${icons[type] || 'ℹ'}</span>
+      <span class="cf2github-toast-content">
+        <span class="cf2github-toast-title">${title}</span>
+        ${body ? `<span class="cf2github-toast-body">${body}</span>` : ''}
+      </span>
+      <button class="cf2github-toast-close" aria-label="Dismiss notification" title="Dismiss">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    // Trigger entry animation
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => toast.classList.add('cf2github-toast-show'));
+    });
+
+    function dismiss() {
+      toast.classList.remove('cf2github-toast-show');
+      toast.classList.add('cf2github-toast-hide');
+      setTimeout(() => toast.remove(), 180);
+    }
+
+    toast.querySelector('.cf2github-toast-close').addEventListener('click', dismiss);
+
+    if (duration > 0) {
+      setTimeout(dismiss, duration);
+    }
   }
 
   if (document.readyState === 'loading') {

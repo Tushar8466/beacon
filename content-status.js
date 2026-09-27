@@ -179,10 +179,10 @@
 
       showToast(`Pushing solution for ${contestId}${problemIndex} to GitHub...`, 'info', 3000);
 
-      // Check settings
-      if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.sync) {
+      // Check settings and extension runtime validity
+      if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id || !chrome.storage || !chrome.storage.sync) {
         processingSubmissions.delete(submissionId);
-        showToast('Extension reloaded. Please refresh the page (Cmd+R / F5).', 'error', 6000);
+        showToast('Extension reloaded or updated. Please refresh the page (Cmd+R / F5).', 'error', 6000);
         return;
       }
 
@@ -195,7 +195,7 @@
 
       if (!token || !owner || !repo) {
         processingSubmissions.delete(submissionId);
-        showToast('GitHub settings incomplete. Click CF2GitHub icon to configure token and repo.', 'error', 6000);
+        showToast('GitHub settings incomplete. Click Beacon icon to configure token and repo.', 'error', 6000);
         return;
       }
 
@@ -246,25 +246,36 @@ ${code}
 
       await pushFileToGitHubDirect({
         token, owner, repo, branch, filePath: readmeFilePath, contentBase64: readmeBase64, commitMessage: commitMsgReadme
-      }).catch(err => console.warn('[CF2GitHub] Auto-push README note:', err));
+      }).catch(err => console.warn('[Beacon] Auto-push README note:', err));
 
       showToast(`Pushed ${cleanContest}${cleanIndex} - ${problemName} to GitHub!`, 'success');
 
       // Record in local storage
-      const updatedStorage = await chrome.storage.local.get('pushedSubmissions');
-      const currentMap = updatedStorage.pushedSubmissions || {};
-      currentMap[submissionId] = {
-        contestId: cleanContest,
-        problemIndex: cleanIndex,
-        problemName,
-        pushedAt: new Date().toISOString()
-      };
-      await chrome.storage.local.set({ pushedSubmissions: currentMap });
+      try {
+        if (chrome?.runtime?.id && chrome?.storage?.local) {
+          const updatedStorage = await chrome.storage.local.get('pushedSubmissions');
+          const currentMap = updatedStorage.pushedSubmissions || {};
+          currentMap[submissionId] = {
+            contestId: cleanContest,
+            problemIndex: cleanIndex,
+            problemName,
+            pushedAt: new Date().toISOString()
+          };
+          await chrome.storage.local.set({ pushedSubmissions: currentMap });
+        }
+      } catch (storageErr) {
+        console.warn('[Beacon] Local storage update skipped:', storageErr);
+      }
 
     } catch (err) {
       processingSubmissions.delete(submissionId);
-      console.error('[CF2GitHub] Error processing submission:', err);
-      showToast(`CF2GitHub error: ${err.message}`, 'error', 6000);
+      console.error('[Beacon] Error processing submission:', err);
+      const msg = err && err.message ? err.message : String(err);
+      if (msg.includes('Extension context invalidated') || !chrome?.runtime?.id) {
+        showToast('Extension reloaded or updated. Please refresh the page (Cmd+R / F5).', 'error', 6000);
+      } else {
+        showToast(`Beacon error: ${msg}`, 'error', 6000);
+      }
     }
   }
 

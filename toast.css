@@ -1,80 +1,170 @@
-/* CF2GitHub Toast Notification Styles */
+/* ════════════════════════════════════════════════════════════
+   Beacon — Toast Notification Styles
+   Injected into Codeforces pages via content_scripts.
+   High z-index, isolated from page styles, polished design.
+   ════════════════════════════════════════════════════════════ */
 
+/* Container — stacks toasts bottom-right, newest on top */
 .cf2github-toast-container {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 999999;
+  z-index: 2147483647;           /* max possible, above CF modals */
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: column-reverse; /* newest toast on top */
+  gap: 8px;
   pointer-events: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-.cf2github-toast {
-  pointer-events: auto;
-  min-width: 280px;
-  max-width: 420px;
-  padding: 12px 16px;
-  border-radius: 10px;
-  background: rgba(18, 20, 29, 0.95);
-  backdrop-filter: blur(8px);
-  color: #f3f4f6;
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 1.4;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  /* Prevent CF page styles bleeding in */
+  all: initial;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  opacity: 0;
-  transform: translateY(20px) scale(0.95);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
+/* Individual toast */
+.cf2github-toast {
+  all: initial;                  /* hard reset from CF styles */
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 280px;
+  max-width: 380px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(13, 17, 27, 0.97);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  color: #f1f5f9;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  pointer-events: auto;
+  cursor: default;
+  /* Layered shadow for depth on both light & dark CF sections */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    0 16px 40px rgba(0, 0, 0, 0.35);
+  /* Entry animation */
+  opacity: 0;
+  transform: translateX(16px) scale(0.96);
+  transition:
+    opacity    220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform  220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Visible state */
 .cf2github-toast-show {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(0) scale(1);
 }
 
+/* Exit animation (JS adds this class before removal) */
+.cf2github-toast-hide {
+  opacity: 0;
+  transform: translateX(16px) scale(0.96);
+  transition:
+    opacity   160ms ease-in,
+    transform 160ms ease-in;
+}
+
+/* Icon badge */
 .cf2github-toast-icon {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  font-weight: bold;
-  font-size: 14px;
-  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
 }
 
+/* Success */
 .cf2github-toast-success {
-  border-left: 4px solid #10b981;
+  border-left: 3px solid #10b981;
 }
 .cf2github-toast-success .cf2github-toast-icon {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
 }
 
+/* Error */
 .cf2github-toast-error {
-  border-left: 4px solid #ef4444;
+  border-left: 3px solid #ef4444;
 }
 .cf2github-toast-error .cf2github-toast-icon {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
 }
 
+/* Info */
 .cf2github-toast-info {
-  border-left: 4px solid #3b82f6;
+  border-left: 3px solid #3b82f6;
 }
 .cf2github-toast-info .cf2github-toast-icon {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
 }
 
+/* Text area */
 .cf2github-toast-content {
-  flex-grow: 1;
+  flex: 1;
   word-break: break-word;
+  min-width: 0;
+}
+
+.cf2github-toast-title {
+  display: block;
+  font-weight: 600;
+  font-size: 12.5px;
+  margin-bottom: 1px;
+  color: #f8fafc;
+}
+
+.cf2github-toast-body {
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Dismiss (×) button */
+.cf2github-toast-close {
+  all: initial;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+  margin-left: 2px;
+  margin-top: -1px;
+  font-family: inherit;
+}
+
+.cf2github-toast-close:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.1);
 }
