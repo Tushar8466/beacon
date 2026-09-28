@@ -7,87 +7,146 @@
   <title>Beacon — Codeforces to GitHub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
   <div class="popup-container">
 
+    <!-- ── Ambient Glow Backdrops ───────────────────────── -->
+    <div class="glow-orb orb-primary" aria-hidden="true"></div>
+    <div class="glow-orb orb-secondary" aria-hidden="true"></div>
+
     <!-- ── Header ──────────────────────────────────────── -->
     <header class="header">
       <div class="brand">
-        <div class="logo-icon">
-          <img src="icons/icon48.png" alt="Beacon logo" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+        <div class="logo-wrapper">
+          <div class="logo-aura" aria-hidden="true"></div>
+          <div class="logo-icon">
+            <img src="icons/icon48.png" alt="Beacon logo">
+          </div>
         </div>
-        <div>
-          <h1 class="title">Beacon</h1>
-          <p class="subtitle">Codeforces → GitHub</p>
+        <div class="brand-text">
+          <div class="title-row">
+            <h1 class="title">Beacon</h1>
+            <span class="version-tag">v1.0</span>
+          </div>
+          <p class="subtitle">Codeforces → GitHub Sync</p>
         </div>
       </div>
-      <span class="version-badge">v1.0</span>
+
+      <!-- Live Radar Status Pill -->
+      <div id="header-status" class="status-pill status-ready" title="Extension Status">
+        <span class="status-pulse-dot" aria-hidden="true"></span>
+        <span id="status-text" class="status-label">Ready</span>
+      </div>
     </header>
 
     <!-- ── Loading skeleton (hidden after storage read) ── -->
     <div id="loading-skeleton" class="skeleton-wrap">
-      <div class="skeleton sk-tall"></div>
-      <div class="skeleton sk-short"></div>
-      <div class="skeleton sk-medium"></div>
+      <div class="skeleton sk-hero"></div>
+      <div class="skeleton-grid">
+        <div class="skeleton sk-tile"></div>
+        <div class="skeleton sk-tile"></div>
+        <div class="skeleton sk-tile"></div>
+      </div>
+      <div class="skeleton sk-bar"></div>
     </div>
 
-    <!-- ── Shared alert ──────────────────────────────────── -->
+    <!-- ── Shared Alert Banner ──────────────────────────── -->
     <div id="status-alert" class="alert hidden" role="alert" aria-live="polite">
       <span id="alert-icon" class="alert-icon" aria-hidden="true"></span>
       <span id="alert-message" class="alert-message"></span>
     </div>
 
     <!-- ══════════════════════════════════════════════════
-         CONNECTED VIEW
+         CONNECTED VIEW (Command Center)
          ══════════════════════════════════════════════════ -->
-    <section id="connected-view" class="view hidden" aria-label="Connected repository">
+    <section id="connected-view" class="view hidden" aria-label="Connected repository dashboard">
 
-      <!-- Repo status card -->
-      <div class="connected-card">
-        <div class="connected-badge" aria-hidden="true">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-            stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
+      <!-- Hero Repo Card -->
+      <div class="hero-repo-card">
+        <div class="hero-top-row">
+          <div class="repo-badge" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path>
+            </svg>
+          </div>
+          <div class="repo-details">
+            <span class="repo-meta-label">Active Repository</span>
+            <a id="repo-link" class="repo-name-link" href="#" target="_blank" rel="noopener noreferrer" title="View repository on GitHub">
+              <span>Loading...</span>
+              <svg class="external-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="7" y1="17" x2="17" y2="7"></line>
+                <polyline points="7 7 17 7 17 17"></polyline>
+              </svg>
+            </a>
+          </div>
         </div>
-        <div class="connected-info">
-          <span class="connected-label">Connected to</span>
-          <a id="repo-link" class="repo-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+
+        <div class="repo-status-bar">
+          <div class="status-indicator-badge">
+            <span class="pulse-indicator"></span>
+            <span class="status-indicator-text">Sync Engine Active</span>
+          </div>
+          <span class="connection-health">REST API v3</span>
         </div>
       </div>
 
-      <!-- Branch & Folder Prefix chips -->
-      <div class="chips-row" aria-label="Repository settings">
-        <div class="chip">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="6" y1="3" x2="6" y2="15"></line>
-            <circle cx="18" cy="6" r="3"></circle>
-            <circle cx="6" cy="18" r="3"></circle>
-            <path d="M18 9a9 9 0 0 1-9 9"></path>
-          </svg>
-          <span class="chip-label">Branch</span>
-          <span id="chip-branch" class="chip-value"></span>
+      <!-- Quick Metrics Grid -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-blue">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-title">Synced</span>
+            <span id="stat-synced-count" class="metric-value">0</span>
+          </div>
         </div>
-        <div class="chip">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span class="chip-label">Prefix</span>
-          <span id="chip-prefix" class="chip-value"></span>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-purple">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="6" y1="3" x2="6" y2="15"></line>
+              <circle cx="18" cy="6" r="3"></circle>
+              <circle cx="6" cy="18" r="3"></circle>
+              <path d="M18 9a9 9 0 0 1-9 9"></path>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-title">Branch</span>
+            <span id="chip-branch" class="metric-value font-mono">main</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon metric-icon-cyan">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <div class="metric-content">
+            <span class="metric-title">Prefix</span>
+            <span id="chip-prefix" class="metric-value font-mono">CF</span>
+          </div>
         </div>
       </div>
 
-      <!-- Auto-push toggle -->
-      <div class="toggle-card">
-        <div class="toggle-info">
-          <span class="toggle-title">Auto-Push Accepted Solutions</span>
-          <span class="toggle-desc">Pushes submissions from the last ~15 minutes automatically</span>
+      <!-- Auto-Push Toggle Card -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <div class="feature-info">
+          <span class="feature-title">Auto-Push Accepted Solutions</span>
+          <span class="feature-desc">Watches Codeforces and syncs within ~15 min</span>
         </div>
         <label class="switch" aria-label="Toggle auto-push">
           <input type="checkbox" id="autoPushConnected">
@@ -95,19 +154,33 @@
         </label>
       </div>
 
-      <!-- Actions -->
+      <!-- Recent Synced Activity Section -->
+      <div class="activity-section">
+        <div class="activity-header">
+          <span class="activity-title">Recent Activity</span>
+          <span id="activity-badge" class="activity-badge">Live</span>
+        </div>
+        <div id="recent-activity-list" class="activity-list">
+          <!-- Populated dynamically via popup.js -->
+          <div class="activity-empty">
+            <div class="empty-icon" aria-hidden="true">✨</div>
+            <p class="empty-text">Awaiting your next Accepted submission.</p>
+            <span class="empty-hint">Solve on Codeforces to see it sync here.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons Row -->
       <div class="actions-row">
         <button type="button" id="change-repo-btn" class="btn btn-secondary">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
           </svg>
-          <span>Change Repo</span>
+          <span>Configure</span>
         </button>
         <button type="button" id="disconnect-btn" class="btn btn-danger">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18.36 6.64A9 9 0 0 1 20.77 15"></path>
             <path d="M6.16 6.16a9 9 0 1 0 12.68 12.68"></path>
             <path d="M12 2v4"></path>
@@ -119,43 +192,72 @@
     </section>
 
     <!-- ══════════════════════════════════════════════════
-         SETTINGS FORM
+         SETTINGS FORM (Configuration View)
          ══════════════════════════════════════════════════ -->
     <main id="settings-view" class="view hidden" aria-label="Repository setup">
 
-      <!-- First-run welcome banner (hidden when editing) -->
-      <div id="welcome-banner" class="welcome-banner">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        <span>Connect a GitHub repo to start auto-syncing your Accepted solutions.</span>
+      <!-- First-run Welcome Banner -->
+      <div id="welcome-banner" class="welcome-card">
+        <div class="welcome-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+        </div>
+        <div class="welcome-content">
+          <strong class="welcome-title">Connect your GitHub Repository</strong>
+          <p class="welcome-subtitle">Accepted Codeforces solutions will be automatically committed with full READMEs.</p>
+        </div>
       </div>
+
+      <!-- Expandable Token Guide -->
+      <details class="token-guide">
+        <summary class="token-guide-summary">
+          <span class="guide-summary-left">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Need a GitHub Token? (1-minute guide)</span>
+          </span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </summary>
+        <div class="token-guide-body">
+          <ol class="guide-steps">
+            <li>Open <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">github.com/settings/tokens</a>.</li>
+            <li>Choose <strong>Generate new token (classic)</strong> and select the <code>repo</code> scope.</li>
+            <li>Or for a <strong>Fine-grained token</strong>, grant <code>Contents: Read and write</code>.</li>
+            <li>Copy and paste the token below.</li>
+          </ol>
+        </div>
+      </details>
 
       <form id="settings-form" autocomplete="off" novalidate>
 
         <!-- GitHub Token -->
         <div class="form-group" id="group-token">
           <label for="githubToken" class="form-label">
-            GitHub Personal Access Token
+            <span>Personal Access Token</span>
             <span class="required" aria-label="required">*</span>
           </label>
           <div class="input-wrapper">
-            <input type="password" id="githubToken" name="githubToken"
-              placeholder="ghp_xxxx  or  github_pat_xxxx"
-              autocomplete="new-password" required />
-            <button type="button" id="toggle-token-btn" class="icon-btn"
-              aria-label="Toggle token visibility" title="Toggle visibility">
-              <svg id="eye-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </span>
+            <input type="password" id="githubToken" name="githubToken" class="font-mono input-has-icon"
+              placeholder="ghp_xxxx or github_pat_xxxx" autocomplete="new-password" required />
+            <button type="button" id="toggle-token-btn" class="icon-btn" aria-label="Toggle token visibility" title="Toggle visibility">
+              <svg id="eye-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
             </button>
           </div>
-          <span class="form-hint">Needs <code>repo</code> scope or <code>Contents: Read &amp; Write</code> in fine-grained tokens.</span>
           <span class="field-error hidden" id="err-token" role="alert"></span>
         </div>
 
@@ -163,19 +265,31 @@
         <div class="form-row">
           <div class="form-group flex-1" id="group-owner">
             <label for="repoOwner" class="form-label">
-              Owner <span class="required" aria-label="required">*</span>
+              <span>Repo Owner</span>
+              <span class="required" aria-label="required">*</span>
             </label>
-            <input type="text" id="repoOwner" name="repoOwner"
-              placeholder="your-handle" required />
-            <span class="form-hint">Exact GitHub username</span>
+            <div class="input-wrapper">
+              <span class="input-icon" aria-hidden="true">@</span>
+              <input type="text" id="repoOwner" name="repoOwner" class="input-has-icon"
+                placeholder="username" required />
+            </div>
             <span class="field-error hidden" id="err-owner" role="alert"></span>
           </div>
+
           <div class="form-group flex-1" id="group-repo">
             <label for="repoName" class="form-label">
-              Repository <span class="required" aria-label="required">*</span>
+              <span>Repo Name</span>
+              <span class="required" aria-label="required">*</span>
             </label>
-            <input type="text" id="repoName" name="repoName"
-              placeholder="my-solutions" required />
+            <div class="input-wrapper">
+              <span class="input-icon" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </span>
+              <input type="text" id="repoName" name="repoName" class="input-has-icon"
+                placeholder="solutions" required />
+            </div>
             <span class="field-error hidden" id="err-repo" role="alert"></span>
           </div>
         </div>
@@ -183,24 +297,43 @@
         <!-- Branch & Folder Prefix row -->
         <div class="form-row">
           <div class="form-group flex-1">
-            <label for="branch" class="form-label">Branch</label>
-            <input type="text" id="branch" name="branch" placeholder="main" value="main"
-              title="The branch to push solutions to (e.g. main or master)" />
-            <span class="form-hint">Target push branch</span>
+            <label for="branch" class="form-label">
+              <span>Branch</span>
+            </label>
+            <div class="input-wrapper">
+              <span class="input-icon" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="6" y1="3" x2="6" y2="15"></line>
+                  <circle cx="18" cy="6" r="3"></circle>
+                  <circle cx="6" cy="18" r="3"></circle>
+                  <path d="M18 9a9 9 0 0 1-9 9"></path>
+                </svg>
+              </span>
+              <input type="text" id="branch" name="branch" class="input-has-icon font-mono" placeholder="main" value="main" />
+            </div>
           </div>
+
           <div class="form-group flex-1">
-            <label for="folderPrefix" class="form-label">Folder Prefix</label>
-            <input type="text" id="folderPrefix" name="folderPrefix" placeholder="Codeforces" value="Codeforces"
-              title="Top-level folder inside your repo (e.g. Codeforces/1234A-Problem/)" />
-            <span class="form-hint">Top-level folder in repo</span>
+            <label for="folderPrefix" class="form-label">
+              <span>Folder Prefix</span>
+            </label>
+            <div class="input-wrapper">
+              <span class="input-icon" aria-hidden="true">📁</span>
+              <input type="text" id="folderPrefix" name="folderPrefix" class="input-has-icon font-mono" placeholder="Codeforces" value="Codeforces" />
+            </div>
           </div>
         </div>
 
         <!-- Auto-push toggle -->
-        <div class="toggle-card">
-          <div class="toggle-info">
-            <span class="toggle-title">Auto-Push Accepted Solutions</span>
-            <span class="toggle-desc">Pushes submissions from the last ~15 minutes automatically</span>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <div class="feature-info">
+            <span class="feature-title">Auto-Push Accepted Solutions</span>
+            <span class="feature-desc">Submissions from last ~15 min sync automatically</span>
           </div>
           <label class="switch" aria-label="Toggle auto-push">
             <input type="checkbox" id="autoPush" checked>
@@ -231,7 +364,7 @@
 
         <!-- Cancel — only shown when editing an existing connection -->
         <button type="button" id="cancel-edit-btn" class="btn btn-ghost hidden">
-          ← Cancel, keep existing settings
+          ← Cancel and keep current settings
         </button>
 
       </form>

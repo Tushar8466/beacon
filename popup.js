@@ -1,50 +1,54 @@
 /**
- * Beacon — Popup Script (design-polished pass)
- * No changes to GitHub push logic or storage key names.
+ * Beacon — Popup Script (Ultra-Modern UI Pass)
+ * Controls dual-state views, connection tests, stats, and real-time activity feed.
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
 
   /* ── Element refs ──────────────────────────────────────── */
-  const loadingSkeleton  = document.getElementById('loading-skeleton');
+  const loadingSkeleton    = document.getElementById('loading-skeleton');
+  const headerStatus       = document.getElementById('header-status');
+  const statusText         = document.getElementById('status-text');
 
   // Views
-  const connectedView    = document.getElementById('connected-view');
-  const settingsView     = document.getElementById('settings-view');
+  const connectedView      = document.getElementById('connected-view');
+  const settingsView       = document.getElementById('settings-view');
 
-  // Connected-view
-  const repoLink         = document.getElementById('repo-link');
-  const chipBranch       = document.getElementById('chip-branch');
-  const chipPrefix       = document.getElementById('chip-prefix');
-  const autoPushConn     = document.getElementById('autoPushConnected');
-  const changeRepoBtn    = document.getElementById('change-repo-btn');
-  const disconnectBtn    = document.getElementById('disconnect-btn');
+  // Connected-view elements
+  const repoLink           = document.getElementById('repo-link');
+  const chipBranch         = document.getElementById('chip-branch');
+  const chipPrefix         = document.getElementById('chip-prefix');
+  const statSyncedCount    = document.getElementById('stat-synced-count');
+  const autoPushConn       = document.getElementById('autoPushConnected');
+  const recentActivityList = document.getElementById('recent-activity-list');
+  const changeRepoBtn      = document.getElementById('change-repo-btn');
+  const disconnectBtn      = document.getElementById('disconnect-btn');
 
-  // Settings form
-  const welcomeBanner    = document.getElementById('welcome-banner');
-  const form             = document.getElementById('settings-form');
-  const tokenInput       = document.getElementById('githubToken');
-  const ownerInput       = document.getElementById('repoOwner');
-  const repoInput        = document.getElementById('repoName');
-  const branchInput      = document.getElementById('branch');
-  const folderPrefixInput = document.getElementById('folderPrefix');
-  const autoPushForm     = document.getElementById('autoPush');
-  const toggleTokenBtn   = document.getElementById('toggle-token-btn');
-  const eyeIcon          = document.getElementById('eye-icon');
-  const testBtn          = document.getElementById('test-btn');
-  const testLabel        = document.getElementById('test-label');
-  const testIcon         = document.getElementById('test-icon');
-  const saveBtn          = document.getElementById('save-btn');
-  const saveLabel        = document.getElementById('save-label');
-  const saveIcon         = document.getElementById('save-icon');
-  const cancelEditBtn    = document.getElementById('cancel-edit-btn');
+  // Settings form elements
+  const welcomeBanner      = document.getElementById('welcome-banner');
+  const form               = document.getElementById('settings-form');
+  const tokenInput         = document.getElementById('githubToken');
+  const ownerInput         = document.getElementById('repoOwner');
+  const repoInput          = document.getElementById('repoName');
+  const branchInput        = document.getElementById('branch');
+  const folderPrefixInput  = document.getElementById('folderPrefix');
+  const autoPushForm       = document.getElementById('autoPush');
+  const toggleTokenBtn     = document.getElementById('toggle-token-btn');
+  const eyeIcon            = document.getElementById('eye-icon');
+  const testBtn            = document.getElementById('test-btn');
+  const testLabel          = document.getElementById('test-label');
+  const testIcon           = document.getElementById('test-icon');
+  const saveBtn            = document.getElementById('save-btn');
+  const saveLabel          = document.getElementById('save-label');
+  const saveIcon           = document.getElementById('save-icon');
+  const cancelEditBtn      = document.getElementById('cancel-edit-btn');
 
   // Alert
-  const alertBox         = document.getElementById('status-alert');
-  const alertIcon        = document.getElementById('alert-icon');
-  const alertMessage     = document.getElementById('alert-message');
+  const alertBox           = document.getElementById('status-alert');
+  const alertIcon          = document.getElementById('alert-icon');
+  const alertMessage       = document.getElementById('alert-message');
 
-  // Field error spans + groups
+  // Field error elements + groups
   const errToken = document.getElementById('err-token');
   const errOwner = document.getElementById('err-owner');
   const errRepo  = document.getElementById('err-repo');
@@ -54,19 +58,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let alertDismissTimer = null;
   let savedData = {};
+  let pushedSubmissions = {};
 
   /* ── 1. Load settings & choose initial view ───────────── */
   try {
     const [syncData, localData] = await Promise.all([
       chrome.storage.sync.get(['githubToken', 'repoOwner', 'repoName', 'branch', 'folderPrefix']),
-      chrome.storage.local.get(['autoPush'])
+      chrome.storage.local.get(['autoPush', 'pushedSubmissions'])
     ]);
     savedData = { ...syncData, autoPush: localData.autoPush };
+    pushedSubmissions = localData.pushedSubmissions || {};
   } catch (err) {
     console.error('[Beacon] Failed to load settings:', err);
   }
 
-  // Hide skeleton; show the right view
+  // Hide skeleton
   loadingSkeleton.classList.add('hidden');
 
   const isConnected = !!(savedData.githubToken && savedData.repoOwner && savedData.repoName);
@@ -76,7 +82,69 @@ document.addEventListener('DOMContentLoaded', async () => {
     showSettingsForm(false);
   }
 
-  /* ── View helpers ──────────────────────────────────────── */
+  /* ── View Helpers ──────────────────────────────────────── */
+
+  function updateHeaderStatus(state) {
+    if (!headerStatus || !statusText) return;
+    headerStatus.className = 'status-pill';
+
+    if (state === 'ready') {
+      headerStatus.classList.add('status-ready');
+      statusText.textContent = 'Sync Active';
+    } else if (state === 'paused') {
+      headerStatus.classList.add('status-paused');
+      statusText.textContent = 'Sync Paused';
+    } else {
+      headerStatus.classList.add('status-unconfigured');
+      statusText.textContent = 'Setup Required';
+    }
+  }
+
+  function renderRecentActivity() {
+    if (!recentActivityList) return;
+    const entries = Object.entries(pushedSubmissions);
+
+    if (statSyncedCount) {
+      statSyncedCount.textContent = entries.length;
+    }
+
+    if (entries.length === 0) {
+      recentActivityList.innerHTML = `
+        <div class="activity-empty">
+          <div class="empty-icon" aria-hidden="true">✨</div>
+          <p class="empty-text">Awaiting your next Accepted solution</p>
+          <span class="empty-hint">Solve on Codeforces to see it sync here.</span>
+        </div>
+      `;
+      return;
+    }
+
+    // Sort descending by pushedAt timestamp
+    const sorted = entries
+      .map(([id, item]) => ({ id, ...item }))
+      .sort((a, b) => new Date(b.pushedAt || 0) - new Date(a.pushedAt || 0))
+      .slice(0, 3); // show latest 3
+
+    recentActivityList.innerHTML = sorted.map(item => {
+      const contest = item.contestId || '';
+      const index = item.problemIndex || '';
+      const name = item.problemName || 'Problem';
+      const timeStr = formatTimeAgo(item.pushedAt);
+      const url = contest && index
+        ? `https://codeforces.com/contest/${contest}/problem/${index}`
+        : 'https://codeforces.com';
+
+      return `
+        <a href="${url}" target="_blank" rel="noopener noreferrer" class="activity-item" title="Open on Codeforces">
+          <div class="activity-item-left">
+            <span class="problem-badge font-mono">${contest}${index}</span>
+            <span class="problem-name">${escapeHtml(name)}</span>
+          </div>
+          <span class="activity-time font-mono">${timeStr}</span>
+        </a>
+      `;
+    }).join('');
+  }
 
   function showConnectedView(data) {
     hideAlert();
@@ -86,11 +154,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const prefix = data.folderPrefix  || 'Codeforces';
     const ap     = data.autoPush      !== false;
 
-    repoLink.textContent = `${owner}/${repo}`;
-    repoLink.href = `https://github.com/${owner}/${repo}`;
+    // Repo title link
+    const cleanRepoText = `${owner}/${repo}`;
+    repoLink.innerHTML = `
+      <span>${escapeHtml(cleanRepoText)}</span>
+      <svg class="external-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="7" y1="17" x2="17" y2="7"></line>
+        <polyline points="7 7 17 7 17 17"></polyline>
+      </svg>
+    `;
+    repoLink.href = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+
     chipBranch.textContent = branch;
     chipPrefix.textContent = prefix;
-    autoPushConn.checked = ap;
+    autoPushConn.checked   = ap;
+
+    updateHeaderStatus(ap ? 'ready' : 'paused');
+    renderRecentActivity();
 
     settingsView.classList.add('hidden');
     connectedView.classList.remove('hidden');
@@ -99,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function showSettingsForm(hasExistingConn) {
     hideAlert();
 
-    // Pre-fill with saved values
+    // Fill form
     tokenInput.value        = savedData.githubToken   || '';
     ownerInput.value        = savedData.repoOwner     || '';
     repoInput.value         = savedData.repoName      || '';
@@ -107,40 +187,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     folderPrefixInput.value = savedData.folderPrefix  || 'Codeforces';
     autoPushForm.checked    = savedData.autoPush      !== false;
 
-    // Welcome banner only for first-run (no existing connection)
     welcomeBanner.classList.toggle('hidden', hasExistingConn);
-
-    // Cancel button only when editing
     cancelEditBtn.classList.toggle('hidden', !hasExistingConn);
 
-    // Reset any lingering validation state
+    updateHeaderStatus(hasExistingConn ? 'ready' : 'unconfigured');
     clearAllFieldErrors();
 
     connectedView.classList.add('hidden');
     settingsView.classList.remove('hidden');
   }
 
-  /* ── Connected-view: auto-push toggle ─────────────────── */
+  /* ── Auto-push toggle in Connected View ──────────────── */
   autoPushConn.addEventListener('change', async () => {
     const val = autoPushConn.checked;
     try {
       await chrome.storage.local.set({ autoPush: val });
       autoPushForm.checked = val;
       savedData.autoPush   = val;
+      updateHeaderStatus(val ? 'ready' : 'paused');
     } catch (err) {
-      console.error('[Beacon] Failed to save autoPush:', err);
+      console.error('[Beacon] Failed to save autoPush toggle:', err);
     }
   });
 
-  /* ── "Change Repository" ───────────────────────────────── */
+  /* ── "Configure" button ───────────────────────────────── */
   changeRepoBtn.addEventListener('click', () => showSettingsForm(true));
 
-  /* ── "Cancel" ──────────────────────────────────────────── */
+  /* ── "Cancel" button ──────────────────────────────────── */
   cancelEditBtn.addEventListener('click', () => showConnectedView(savedData));
 
-  /* ── "Disconnect" ──────────────────────────────────────── */
+  /* ── "Disconnect" button ──────────────────────────────── */
   disconnectBtn.addEventListener('click', async () => {
-    const ok = confirm('Disconnect this GitHub repository? You can reconnect anytime.');
+    const ok = confirm('Disconnect this repository from Beacon? Solutions will not be lost.');
     if (!ok) return;
 
     try {
@@ -149,13 +227,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       ]);
       savedData = { autoPush: savedData.autoPush };
       showSettingsForm(false);
-      showAlert('Disconnected. Add a repository to reconnect.', 'info');
+      showAlert('Disconnected. Configure a repository to reconnect.', 'info');
     } catch (err) {
       showAlert(`Disconnect failed: ${err.message}`, 'error');
     }
   });
 
-  /* ── Password toggle ───────────────────────────────────── */
+  /* ── Toggle Password Visibility ───────────────────────── */
   toggleTokenBtn.addEventListener('click', () => {
     const show = tokenInput.type === 'password';
     tokenInput.type = show ? 'text' : 'password';
@@ -165,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleTokenBtn.setAttribute('aria-label', show ? 'Hide token' : 'Show token');
   });
 
-  /* ── Inline validation: clear error on input ──────────── */
+  /* ── Inline Field Validation ──────────────────────────── */
   tokenInput.addEventListener('input', () => clearFieldError(grpToken, errToken));
   ownerInput.addEventListener('input', () => clearFieldError(grpOwner, errOwner));
   repoInput.addEventListener('input',  () => clearFieldError(grpRepo,  errRepo));
@@ -181,7 +259,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const folderPrefix = folderPrefixInput.value.trim() || 'Codeforces';
     const autoPush     = autoPushForm.checked;
 
-    // Inline validation
     let hasError = false;
     clearAllFieldErrors();
 
@@ -190,16 +267,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       hasError = true;
     }
     if (!repoOwner) {
-      setFieldError(grpOwner, errOwner, 'Repo owner is required.');
+      setFieldError(grpOwner, errOwner, 'Repository owner is required.');
       hasError = true;
     }
     if (!repoName) {
-      setFieldError(grpRepo, errRepo, 'Repo name is required.');
+      setFieldError(grpRepo, errRepo, 'Repository name is required.');
       hasError = true;
     }
     if (hasError) return;
 
-    // Save loading state
     setSaveBtnState('loading');
 
     try {
@@ -208,12 +284,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       savedData = { githubToken, repoOwner, repoName, branch, folderPrefix, autoPush };
 
-      // Brief success state on button, then switch to connected view
       setSaveBtnState('success');
-      await delay(700);
+      await delay(600);
 
       showConnectedView(savedData);
-      showAlert('Repository connected successfully!', 'success', 4000);
+      showAlert('Repository connected and ready to sync!', 'success', 4000);
     } catch (err) {
       setSaveBtnState('idle');
       showAlert(`Error saving settings: ${err.message}`, 'error');
@@ -227,12 +302,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const repo  = repoInput.value.trim();
 
     if (!token || !owner || !repo) {
-      showAlert('Fill in Token, Owner, and Repo Name before testing.', 'error');
+      showAlert('Please fill in Token, Owner, and Repo Name before testing.', 'error');
       return;
     }
 
     setTestBtnState('loading');
-    showAlert('Connecting to GitHub API…', 'info');
+    showAlert('Verifying repository with GitHub API…', 'info');
 
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 10000);
@@ -260,7 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showAlert('Invalid GitHub Personal Access Token.', 'error');
       } else if (res.status === 404) {
         setTestBtnState('idle');
-        showAlert(`Repository '${owner}/${repo}' not found. Check the owner handle and repo name.`, 'error');
+        showAlert(`Repository '${owner}/${repo}' not found. Make sure repo exists & token has 'Contents: Read and write' permissions.`, 'error');
       } else {
         const err = await res.json().catch(() => ({}));
         setTestBtnState('idle');
@@ -270,15 +345,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       clearTimeout(tid);
       setTestBtnState('idle');
       if (err.name === 'AbortError') {
-        showAlert('Request timed out (10 s). Check your network or token.', 'error');
+        showAlert('Request timed out (10s). Check your connection or token.', 'error');
       } else {
         showAlert(`Connection failed: ${err.message}`, 'error');
       }
     }
   });
 
-  /* ── Button state machines ─────────────────────────────── */
-
+  /* ── Button State Machines ─────────────────────────────── */
   const UPLOAD_ICON = `<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>`;
   const CHECK_ICON  = `<polyline points="20 6 9 17 4 12"></polyline>`;
   const BOLT_ICON   = `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>`;
@@ -289,22 +363,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (state === 'loading') {
       saveIcon.innerHTML = '';
-      saveIcon.outerHTML; // force reflow
-      saveLabel.textContent = 'Saving…';
-      // Replace icon with spinner
+      saveLabel.textContent = 'Connecting…';
       const sp = document.createElement('span');
       sp.className = 'btn-spinner';
       saveBtn.insertBefore(sp, saveBtn.firstChild);
     } else if (state === 'success') {
-      // Remove spinner if present
       const sp = saveBtn.querySelector('.btn-spinner');
       if (sp) sp.remove();
       saveIcon.innerHTML = CHECK_ICON;
-      saveLabel.textContent = 'Saved!';
+      saveLabel.textContent = 'Connected!';
       saveBtn.classList.add('state-success');
       saveBtn.disabled = false;
     } else {
-      // idle
       const sp = saveBtn.querySelector('.btn-spinner');
       if (sp) sp.remove();
       saveIcon.innerHTML = UPLOAD_ICON;
@@ -328,7 +398,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const sp = testBtn.querySelector('.btn-spinner');
       if (sp) sp.remove();
       testIcon.innerHTML = CHECK_ICON;
-      testLabel.textContent = 'Connected!';
+      testLabel.textContent = 'Verified!';
       testBtn.disabled = false;
     } else {
       const sp = testBtn.querySelector('.btn-spinner');
@@ -339,15 +409,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  /* ── Alert helpers ─────────────────────────────────────── */
-
+  /* ── Alert Helpers ─────────────────────────────────────── */
   function showAlert(msg, type = 'info', autoDismissMs = 0) {
     clearTimeout(alertDismissTimer);
     alertBox.className = `alert alert-${type}`;
-    alertIcon.textContent  = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+    alertIcon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
     alertMessage.textContent = msg;
 
-    // Auto-dismiss success/info; keep errors visible
     if (autoDismissMs > 0 || type === 'success') {
       const ms = autoDismissMs > 0 ? autoDismissMs : 4000;
       alertDismissTimer = setTimeout(hideAlert, ms);
@@ -359,8 +427,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     alertBox.className = 'alert hidden';
   }
 
-  /* ── Field validation helpers ──────────────────────────── */
-
+  /* ── Field Validation Helpers ──────────────────────────── */
   function setFieldError(group, errEl, msg) {
     group.classList.add('has-error');
     errEl.textContent = msg;
@@ -379,6 +446,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearFieldError(grpRepo,  errRepo);
   }
 
-  /* ── Utility ───────────────────────────────────────────── */
+  /* ── Utility Functions ─────────────────────────────────── */
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
+  }
+
+  function formatTimeAgo(isoString) {
+    if (!isoString) return '';
+    const now = new Date();
+    const date = new Date(isoString);
+    const sec = Math.floor((now - date) / 1000);
+    if (sec < 60) return 'just now';
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const days = Math.floor(hr / 24);
+    return `${days}d ago`;
+  }
 });
