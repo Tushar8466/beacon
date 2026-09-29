@@ -1,8 +1,9 @@
 /**
- * CF2GitHub - Content Script for Codeforces Status / Submissions Pages
+ * Beacon — Content Script for Codeforces Status / Submissions Pages
  * 
- * Auto-detects Accepted submissions in status tables, checks if they are recent
- * (submitted <= 15 minutes ago), fetches source code, and pushes directly to GitHub.
+ * 1. Auto-detects recent Accepted submissions (<= 15 min) and syncs to GitHub.
+ * 2. Injects a modern Beacon Bulk Sync Bar above status tables to backfill older submissions.
+ * 3. Injects individual "⚡ Push" buttons and "✓ Synced" badges directly into table rows.
  */
 
 (function () {
@@ -12,9 +13,10 @@
 
   // In-flight processing set to prevent duplicate concurrent fetches
   const processingSubmissions = new Set();
+  let isBulkSyncing = false;
 
   /**
-   * Main initializer: checks autoPush setting, initial table scan, and sets up MutationObserver.
+   * Main initializer: checks settings, table scan, and sets up MutationObserver.
    */
   async function init() {
     if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
@@ -22,26 +24,21 @@
     }
 
     try {
-      const storage = await chrome.storage.local.get(['autoPush', 'pushedSubmissions']);
-      const autoPushEnabled = storage.autoPush !== false; // Default to true if unset
-
-      if (!autoPushEnabled) {
-        console.log('[CF2GitHub] Auto-push is disabled in extension settings.');
-        return;
-      }
+      detectAndStoreHandle();
 
       const table = findStatusTable();
       if (!table) {
-        console.log('[CF2GitHub] Status table not found on page.');
         return;
       }
 
-      // Process existing table rows
-      scanTableRows(table);
+      // Initial scan and render
+      await scanAndRenderTable(table);
 
       // Watch table body for dynamic verdict updates (judging -> Accepted)
       const observer = new MutationObserver(() => {
-        scanTableRows(table);
+        if (!isBulkSyncing) {
+          scanAndRenderTable(table);
+        }
       });
 
       observer.observe(table, {
@@ -50,8 +47,31 @@
         characterData: true
       });
     } catch (err) {
-      console.warn('[CF2GitHub] Context invalidated or initialization deferred:', err);
+      console.warn('[Beacon] Status page observer initialization note:', err);
     }
+  }
+
+  /**
+   * Detects current user handle and stores it for the popup backfill shortcut.
+   */
+  function detectAndStoreHandle() {
+    try {
+      const userLink = document.querySelector('.lang-chooser a[href^="/profile/"], #header a[href^="/profile/"], a[href^="/profile/"]');
+      if (userLink) {
+        const href = userLink.getAttribute('href');
+        const match = href.match(/\/profile\/([A-Za-z0-9_-]+)/);
+        if (match && match[1]) {
+          chrome.storage.local.set({ cfHandle: match[1] });
+          return match[1];
+        }
+      }
+      const subMatch = window.location.pathname.match(/\/submissions\/([A-Za-z0-9_-]+)/);
+      if (subMatch && subMatch[1]) {
+        chrome.storage.local.set({ cfHandle: subMatch[1] });
+        return subMatch[1];
+      }
+    } catch (e) {}
+    return null;
   }
 
   /**
@@ -62,33 +82,9 @@
   }
 
   /**
-   * Scans status table rows for recent Accepted submissions.
+   * Extracts submission metadata from a table row.
    */
-  async function scanTableRows(table) {
-    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
-      return;
-    }
-
-    try {
-      const storage = await chrome.storage.local.get(['autoPush', 'pushedSubmissions']);
-      if (storage.autoPush === false) return;
-
-      const pushedMap = storage.pushedSubmissions || {};
-      const rows = table.querySelectorAll('tr[data-submission-id], tbody tr');
-
-      for (const row of rows) {
-        parseAndProcessRow(row, pushedMap);
-      }
-    } catch (err) {
-      // Ignore invalidated extension context
-    }
-  }
-
-  /**
-   * Parses single row data and initiates push if valid, recent, and Accepted.
-   */
-  async function parseAndProcessRow(row, pushedMap) {
-    // 1. Extract Submission ID
+  function extractRowMetadata(row) {
     let submissionId = row.getAttribute('data-submission-id');
     if (!submissionId) {
       const subLink = row.querySelector('a[href*="/submission/"]');
@@ -97,62 +93,39 @@
         if (match) submissionId = match[1];
       }
     }
-    if (!submissionId) return;
+    if (!submissionId) return null;
 
-    // Skip if already pushed or currently being processed
-    if (pushedMap[submissionId] || processingSubmissions.has(submissionId)) {
-      return;
-    }
-
-    // 2. Check Verdict (Must be Accepted / OK)
+    // Check Verdict (Must be Accepted / OK)
     const verdictEl = row.querySelector('.verdict-accepted, span.verdict-accepted');
     const isAccepted = !!verdictEl || /accepted|ok/i.test(row.textContent);
-    if (!isAccepted) return;
+    if (!isAccepted) return null;
 
-    // Double-check row doesn't say "Running on test" or "In queue"
+    // Filter out rows still judging/compiling
     const rowText = row.textContent.toLowerCase();
     if (rowText.includes('running') || rowText.includes('queue') || rowText.includes('compiling')) {
-      return;
+      return null;
     }
 
-    // 3. Extract & Check Relative Time (Must be recent: <= 15 minutes)
-    const timeEl = row.querySelector('.format-time') || row.querySelector('td:nth-child(2)');
-    const timeText = timeEl ? timeEl.textContent.trim() : '';
-    
-    // Check title attribute if present (e.g. title="3 minutes ago")
-    const titleTime = timeEl ? timeEl.getAttribute('title') : null;
-    const effectiveTime = isRecentSubmission(timeText) ? timeText : (titleTime || timeText);
-
-    if (!isRecentSubmission(effectiveTime)) {
-      return;
-    }
-
-    // Mark as in-flight
-    processingSubmissions.add(submissionId);
-
-    // 4. Extract Problem Info & Language
+    // Problem Info
     const problemLink = row.querySelector('a[href*="/problem/"], a[href*="/problemset/problem/"]');
-    if (!problemLink) {
-      processingSubmissions.delete(submissionId);
-      return;
-    }
+    if (!problemLink) return null;
 
     const problemHref = problemLink.getAttribute('href');
-    const contestMatch = problemHref.match(/(?:contest|problemset\/problem)\/(\d+)\/(?:problem\/)?([A-Za-z0-9]+)/);
-    
+    const contestMatch = problemHref.match(/(?:contest|problemset\/problem|gym)\/(\d+)\/(?:problem\/)?([A-Za-z0-9]+)/);
+
     let contestId = contestMatch ? contestMatch[1] : '';
     let problemIndex = contestMatch ? contestMatch[2] : '';
-    
+
     const rawProblemText = problemLink.textContent.trim();
     let problemName = rawProblemText;
-    
+
     if (rawProblemText.includes('-')) {
       const parts = rawProblemText.split('-');
       if (!problemIndex) problemIndex = parts[0].trim();
       problemName = parts.slice(1).join('-').trim();
     }
 
-    // Extract Language from row cells
+    // Extract Language
     let language = '';
     const cells = Array.from(row.querySelectorAll('td'));
     for (const cell of cells) {
@@ -166,24 +139,251 @@
       language = cells[4].textContent.trim();
     }
 
-    const submissionUrl = problemHref.includes('problemset') 
+    // Submission URL
+    const submissionUrl = problemHref.includes('problemset')
       ? `https://codeforces.com/problemset/submission/${contestId}/${submissionId}`
       : `https://codeforces.com/contest/${contestId}/submission/${submissionId}`;
 
-    // 5. Fetch Source Code & Push
+    // Relative Time
+    const timeEl = row.querySelector('.format-time') || row.querySelector('td:nth-child(2)');
+    const timeText = timeEl ? timeEl.textContent.trim() : '';
+    const titleTime = timeEl ? timeEl.getAttribute('title') : null;
+    const effectiveTime = isRecentSubmission(timeText) ? timeText : (titleTime || timeText);
+
+    return {
+      submissionId,
+      contestId,
+      problemIndex,
+      problemName,
+      language,
+      submissionUrl,
+      effectiveTime,
+      isRecent: isRecentSubmission(effectiveTime)
+    };
+  }
+
+  /**
+   * Scans status table, injects/updates the Beacon Sync Bar, and handles row badges.
+   */
+  async function scanAndRenderTable(table) {
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) {
+      return;
+    }
+
     try {
-      const code = await fetchSourceCode(submissionUrl);
-      if (!code) {
-        throw new Error('Failed to extract source code from submission page.');
+      const storage = await chrome.storage.local.get(['autoPush', 'pushedSubmissions']);
+      const autoPushEnabled = storage.autoPush !== false;
+      const pushedMap = storage.pushedSubmissions || {};
+
+      const rows = table.querySelectorAll('tr[data-submission-id], tbody tr');
+      const acceptedItems = [];
+
+      for (const row of rows) {
+        const meta = extractRowMetadata(row);
+        if (!meta) continue;
+
+        acceptedItems.push({ row, meta });
+
+        // Update row-level badge/action
+        updateRowBadge(row, meta, pushedMap);
+
+        // Auto-push if recent, enabled, and not already pushed
+        if (autoPushEnabled && meta.isRecent && !pushedMap[meta.submissionId] && !processingSubmissions.has(meta.submissionId)) {
+          processingSubmissions.add(meta.submissionId);
+          pushSubmissionCore(meta, true).finally(() => {
+            processingSubmissions.delete(meta.submissionId);
+          });
+        }
       }
 
-      showToast(`Pushing solution for ${contestId}${problemIndex} to GitHub...`, 'info', 3000);
+      // Inject or update the Beacon Sync Bar above the table
+      renderSyncBar(table, acceptedItems, pushedMap);
 
-      // Check settings and extension runtime validity
+    } catch (err) {
+      // Ignore invalidated extension context
+    }
+  }
+
+  /**
+   * Renders the Beacon Sync Bar above the status table.
+   */
+  function renderSyncBar(table, acceptedItems, pushedMap) {
+    if (acceptedItems.length === 0) return;
+
+    let syncBar = document.getElementById('beacon-sync-bar');
+    if (!syncBar) {
+      syncBar = document.createElement('div');
+      syncBar.id = 'beacon-sync-bar';
+      syncBar.className = 'beacon-sync-bar';
+
+      // Insert directly before the table or its parent wrapper
+      const targetParent = table.closest('.datatable') || table;
+      targetParent.parentNode.insertBefore(syncBar, targetParent);
+    }
+
+    const pendingItems = acceptedItems.filter(item => !pushedMap[item.meta.submissionId]);
+    const syncedCount = acceptedItems.length - pendingItems.length;
+
+    const iconUrl = (chrome?.runtime?.getURL) ? chrome.runtime.getURL('icons/icon48.png') : '';
+
+    syncBar.innerHTML = `
+      <div class="beacon-sync-bar-left">
+        <div class="beacon-sync-logo">
+          ${iconUrl ? `<img src="${iconUrl}" alt="Beacon" />` : '🏮'}
+        </div>
+        <div class="beacon-sync-info">
+          <span class="beacon-sync-title">Beacon Sync Manager</span>
+          <span class="beacon-sync-desc" id="beacon-sync-desc">
+            ${pendingItems.length > 0 
+              ? `Found <strong>${acceptedItems.length}</strong> Accepted solutions (<strong>${syncedCount}</strong> synced, <strong>${pendingItems.length}</strong> pending)`
+              : `✓ All <strong>${acceptedItems.length}</strong> solutions on this page are synced to GitHub.`}
+          </span>
+        </div>
+      </div>
+      <div class="beacon-sync-actions">
+        <button type="button" id="beacon-sync-all-btn" class="beacon-btn-sync ${pendingItems.length === 0 ? 'state-done' : ''}" ${pendingItems.length === 0 ? 'disabled' : ''}>
+          ${pendingItems.length > 0 
+            ? `⚡ Sync ${pendingItems.length} Solution${pendingItems.length > 1 ? 's' : ''}` 
+            : '✓ All Synced'}
+        </button>
+      </div>
+    `;
+
+    const syncBtn = syncBar.querySelector('#beacon-sync-all-btn');
+    if (syncBtn && pendingItems.length > 0) {
+      syncBtn.addEventListener('click', () => handleBulkSync(syncBtn, pendingItems));
+    }
+  }
+
+  /**
+   * Executes sequential bulk push of all pending solutions on the page.
+   */
+  async function handleBulkSync(btn, pendingItems) {
+    if (isBulkSyncing) return;
+    isBulkSyncing = true;
+
+    btn.disabled = true;
+    const total = pendingItems.length;
+    let completed = 0;
+    let failed = 0;
+
+    const descEl = document.getElementById('beacon-sync-desc');
+
+    showToast(`Starting Beacon bulk sync for ${total} solutions…`, 'info', 3000);
+
+    for (let i = 0; i < pendingItems.length; i++) {
+      const { row, meta } = pendingItems[i];
+      btn.textContent = `Syncing ${i + 1} of ${total}…`;
+      if (descEl) {
+        descEl.innerHTML = `Pushing <strong>${meta.contestId}${meta.problemIndex} - ${escapeHtml(meta.problemName)}</strong> (${i + 1}/${total})…`;
+      }
+
+      // Mark row as in-flight
+      const rowBtn = row.querySelector('.beacon-row-sync-btn');
+      if (rowBtn) {
+        rowBtn.disabled = true;
+        rowBtn.textContent = '…';
+      }
+
+      const res = await pushSubmissionCore(meta, false);
+      if (res && res.ok) {
+        completed++;
+        // Update row to synced state
+        const storage = await chrome.storage.local.get('pushedSubmissions');
+        updateRowBadge(row, meta, storage.pushedSubmissions || {});
+      } else {
+        failed++;
+        if (rowBtn) {
+          rowBtn.disabled = false;
+          rowBtn.textContent = 'Retry';
+        }
+      }
+
+      // Friendly rate-limiting pause between requests
+      await new Promise(r => setTimeout(r, 750));
+    }
+
+    isBulkSyncing = false;
+    btn.textContent = '✓ All Synced';
+    btn.classList.add('state-done');
+    btn.disabled = true;
+
+    if (descEl) {
+      descEl.innerHTML = `✓ Backfill complete: <strong>${completed}</strong> synced${failed > 0 ? `, ${failed} failed` : ''}.`;
+    }
+
+    showToast(`🎉 Bulk sync complete! Synced ${completed} solutions to GitHub.`, 'success', 6000);
+
+    // Refresh table scan
+    const table = findStatusTable();
+    if (table) {
+      scanAndRenderTable(table);
+    }
+  }
+
+  /**
+   * Updates or injects the row badge / sync button in an individual table row.
+   */
+  function updateRowBadge(row, meta, pushedMap) {
+    // Target the verdict cell or problem cell
+    const verdictCell = row.querySelector('td.status-verdict-cell, td.verdict-accepted, td:nth-child(6)') || row.querySelector('td:last-child');
+    if (!verdictCell) return;
+
+    let badge = row.querySelector('.beacon-row-badge, .beacon-row-sync-btn');
+    const isPushed = !!pushedMap[meta.submissionId];
+
+    if (isPushed) {
+      if (!badge || badge.classList.contains('beacon-row-sync-btn')) {
+        if (badge) badge.remove();
+        const span = document.createElement('span');
+        span.className = 'beacon-row-badge beacon-row-synced';
+        span.title = 'Solution synced to GitHub by Beacon';
+        span.textContent = '✓ Synced';
+        verdictCell.appendChild(span);
+      }
+    } else {
+      if (!badge) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'beacon-row-sync-btn';
+        btn.title = `Sync ${meta.contestId}${meta.problemIndex} to GitHub`;
+        btn.textContent = '⚡ Push';
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          btn.disabled = true;
+          btn.textContent = 'Pushing…';
+          const res = await pushSubmissionCore(meta, true);
+          if (res && res.ok) {
+            const storage = await chrome.storage.local.get('pushedSubmissions');
+            updateRowBadge(row, meta, storage.pushedSubmissions || {});
+            const table = findStatusTable();
+            if (table) scanAndRenderTable(table);
+          } else {
+            btn.disabled = false;
+            btn.textContent = 'Retry';
+          }
+        });
+        verdictCell.appendChild(btn);
+      }
+    }
+  }
+
+  /**
+   * Core function to fetch source code and push a single submission to GitHub.
+   */
+  async function pushSubmissionCore(meta, showNotification = true) {
+    const { submissionId, contestId, problemIndex, problemName, language, submissionUrl } = meta;
+
+    try {
+      const code = await fetchSourceCode(submissionUrl);
+      if (!code || !code.trim()) {
+        throw new Error('Could not extract source code from submission page.');
+      }
+
+      // Check extension runtime validity
       if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.id || !chrome.storage || !chrome.storage.sync) {
-        processingSubmissions.delete(submissionId);
         showToast('Extension reloaded or updated. Please refresh the page (Cmd+R / F5).', 'error', 6000);
-        return;
+        return { ok: false };
       }
 
       const settings = await chrome.storage.sync.get(['githubToken', 'repoOwner', 'repoName', 'branch', 'folderPrefix']);
@@ -194,9 +394,10 @@
       const prefix = settings.folderPrefix ? settings.folderPrefix.trim().replace(/\/+$/, '') : 'Codeforces';
 
       if (!token || !owner || !repo) {
-        processingSubmissions.delete(submissionId);
-        showToast('GitHub settings incomplete. Click Beacon icon to configure token and repo.', 'error', 6000);
-        return;
+        if (showNotification) {
+          showToast('GitHub settings incomplete. Click Beacon icon to configure token and repo.', 'error', 6000);
+        }
+        return { ok: false };
       }
 
       const slug = slugify(problemName || 'Problem');
@@ -216,13 +417,14 @@
         token, owner, repo, branch, filePath: codeFilePath, contentBase64: codeBase64, commitMessage: commitMsgCode
       });
 
-      processingSubmissions.delete(submissionId);
-
       if (!codePush.ok) {
-        showToast(`Push failed: ${codePush.error}`, 'error', 6000);
-        return;
+        if (showNotification) {
+          showToast(`Push failed: ${codePush.error}`, 'error', 6000);
+        }
+        return { ok: false, error: codePush.error };
       }
 
+      // Push README
       const problemUrl = cleanContest && cleanIndex 
         ? `https://codeforces.com/contest/${cleanContest}/problem/${cleanIndex}`
         : 'https://codeforces.com';
@@ -246,9 +448,11 @@ ${code}
 
       await pushFileToGitHubDirect({
         token, owner, repo, branch, filePath: readmeFilePath, contentBase64: readmeBase64, commitMessage: commitMsgReadme
-      }).catch(err => console.warn('[Beacon] Auto-push README note:', err));
+      }).catch(err => console.warn('[Beacon] README note:', err));
 
-      showToast(`Pushed ${cleanContest}${cleanIndex} - ${problemName} to GitHub!`, 'success');
+      if (showNotification) {
+        showToast(`Pushed ${cleanContest}${cleanIndex} - ${problemName} to GitHub!`, 'success');
+      }
 
       // Record in local storage
       try {
@@ -264,18 +468,22 @@ ${code}
           await chrome.storage.local.set({ pushedSubmissions: currentMap });
         }
       } catch (storageErr) {
-        console.warn('[Beacon] Local storage update skipped:', storageErr);
+        console.warn('[Beacon] Local storage update note:', storageErr);
       }
 
+      return { ok: true };
+
     } catch (err) {
-      processingSubmissions.delete(submissionId);
       console.error('[Beacon] Error processing submission:', err);
       const msg = err && err.message ? err.message : String(err);
-      if (msg.includes('Extension context invalidated') || !chrome?.runtime?.id) {
-        showToast('Extension reloaded or updated. Please refresh the page (Cmd+R / F5).', 'error', 6000);
-      } else {
-        showToast(`Beacon error: ${msg}`, 'error', 6000);
+      if (showNotification) {
+        if (msg.includes('Extension context invalidated') || !chrome?.runtime?.id) {
+          showToast('Extension reloaded or updated. Please refresh the page (Cmd+R / F5).', 'error', 6000);
+        } else {
+          showToast(`Beacon error: ${msg}`, 'error', 6000);
+        }
       }
+      return { ok: false, error: msg };
     }
   }
 
@@ -325,7 +533,6 @@ ${code}
         signal: controller.signal
       });
 
-      // If 404/422 occurred with explicit branch (e.g. repo is empty or default branch is master), retry without branch field
       if (!putRes.ok && (putRes.status === 404 || putRes.status === 422) && body.branch) {
         delete body.branch;
         putRes = await fetch(putUrl, {
@@ -364,7 +571,7 @@ ${code}
   }
 
   /**
-   * Fetches submission HTML and extracts source code text.
+   * Fetches submission HTML and extracts clean source code text (strips line numbers if present).
    */
   async function fetchSourceCode(url) {
     const res = await fetch(url, { credentials: 'include' });
@@ -372,10 +579,21 @@ ${code}
     const html = await res.text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     
-    const codeEl = doc.querySelector('#program-source-text, pre.prettyprint');
+    const codeEl = doc.querySelector('#program-source-text, pre.prettyprint, pre.program-source, .source-code pre');
     if (!codeEl) return null;
 
-    return codeEl.textContent;
+    const liElements = codeEl.querySelectorAll('li');
+    if (liElements && liElements.length > 0) {
+      return Array.from(liElements).map(li => li.textContent).join('\n');
+    }
+
+    return (codeEl.textContent || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[m]));
   }
 
   // Initialize script after DOM load

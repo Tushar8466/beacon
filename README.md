@@ -9,8 +9,10 @@ Every solution is organized into a clean folder structure with an auto-generated
 ## ✨ Features
 
 - ⚡ **Automatic Push on Accepted**: Listens to Codeforces status tables via dynamic DOM observers and automatically commits your solution the moment your submission turns green.
-- ⏱️ **Smart Recency Filter**: Only auto-syncs submissions made within the last 15 minutes to prevent flooding your repository when browsing past submission history.
-- 🖱️ **Manual "Push to GitHub" Button**: Sleek floating and inline buttons injected into every submission page and modal popup, allowing you to backfill older submissions or re-trigger anytime.
+- 🔄 **Bulk Sync Manager & Backfill**: An injected control bar on your Codeforces submissions pages that lets you sync all visible Accepted solutions in 1 click with automatic rate-limit throttling.
+- ⚡ **Row-Level Sync Buttons**: Instant "⚡ Push" buttons and "✓ Synced" status badges injected directly into Codeforces submission tables.
+- ⏱️ **Smart Recency Filter**: Automatic sync only triggers for submissions from the last 15 minutes, ensuring your past history isn't accidentally flooded.
+- 🖱️ **Manual "Push to GitHub" Button**: Sleek floating and inline buttons injected into every submission page and modal popup.
 - 📁 **Structured Directory Format**: Solutions are stored neatly by contest and problem:
   ```text
   {folderPrefix}/{contestId}{problemIndex}-{problem-name}/
@@ -119,13 +121,20 @@ Beacon needs permission to commit files to your repository on your behalf. You c
    - Commits `Solution.{ext}` and `README.md` to GitHub.
    - Displays a confirmation toast notification in the corner of your browser.
 
-### 2. Manual Push (Older or Specific Submissions)
+### 2. Manual Push (Single Submissions)
 1. Open any submission on Codeforces (either on its dedicated `/submission/<id>` page or via the popup code viewer).
-2. A **"Push to GitHub"** button will appear:
-   - As a floating button in the bottom-right corner.
-   - As an inline button directly above the code preview block.
-3. Click **Push to GitHub**.
-4. The button displays a spinner (`Pushing...`) and updates to a green checkmark (`Pushed ✓`) once committed.
+2. Click the floating or inline **"Push to GitHub"** button.
+
+### 3. Bulk Backfill (Syncing Multiple Past Submissions)
+If you already solved problems on Codeforces and want to sync them all to GitHub:
+1. Open the Beacon popup and click **Open ↗** under **Sync Past Submissions** (or navigate directly to `https://codeforces.com/submissions/<your-handle>`).
+2. Beacon automatically scans the page and displays the **Beacon Sync Manager** bar directly above the submissions table.
+3. It detects all Accepted submissions on the page, showing how many are already synced vs. pending.
+4. Click **⚡ Sync Visible Solutions**:
+   - Beacon fetches and commits each solution sequentially.
+   - Built-in rate-limiting pauses prevent exceeding GitHub or Codeforces API thresholds.
+   - Live progress indicator tracks each submission (`Syncing 1 of 10...`).
+5. You can also click the individual **⚡ Push** button on any table row to sync just that specific submission!
 
 ---
 

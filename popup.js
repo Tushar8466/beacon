@@ -56,20 +56,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   const grpOwner = document.getElementById('group-owner');
   const grpRepo  = document.getElementById('group-repo');
 
+  const openSubmissionsBtn = document.getElementById('open-submissions-btn');
+  const backfillDesc       = document.getElementById('backfill-desc');
+
   let alertDismissTimer = null;
   let savedData = {};
   let pushedSubmissions = {};
+  let cfHandle = '';
 
   /* ── 1. Load settings & choose initial view ───────────── */
   try {
     const [syncData, localData] = await Promise.all([
       chrome.storage.sync.get(['githubToken', 'repoOwner', 'repoName', 'branch', 'folderPrefix']),
-      chrome.storage.local.get(['autoPush', 'pushedSubmissions'])
+      chrome.storage.local.get(['autoPush', 'pushedSubmissions', 'cfHandle'])
     ]);
     savedData = { ...syncData, autoPush: localData.autoPush };
     pushedSubmissions = localData.pushedSubmissions || {};
+    cfHandle = localData.cfHandle || '';
   } catch (err) {
     console.error('[Beacon] Failed to load settings:', err);
+  }
+
+  if (cfHandle && backfillDesc) {
+    backfillDesc.textContent = `Sync older solutions for @${cfHandle}`;
+  }
+
+  if (openSubmissionsBtn) {
+    openSubmissionsBtn.addEventListener('click', async () => {
+      const data = await chrome.storage.local.get('cfHandle');
+      const handle = data.cfHandle || cfHandle;
+      const targetUrl = handle 
+        ? `https://codeforces.com/submissions/${encodeURIComponent(handle)}`
+        : 'https://codeforces.com/problemset/status?my=on';
+      chrome.tabs.create({ url: targetUrl });
+    });
   }
 
   // Hide skeleton

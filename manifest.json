@@ -30,7 +30,9 @@
         "https://codeforces.com/contest/*/status*",
         "https://codeforces.com/contest/*/my*",
         "https://codeforces.com/problemset/status*",
-        "https://codeforces.com/submissions/*"
+        "https://codeforces.com/submissions/*",
+        "https://codeforces.com/gym/*/status*",
+        "https://codeforces.com/group/*/status*"
       ],
       "css": ["toast.css"],
       "js": ["common.js", "content-status.js"],
